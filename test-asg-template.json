@@ -7,7 +7,7 @@
     "ParameterGroups" : [
       {
         "Label"                         : { "default" : "Instance Config" },
-        "Parameters"                    : [ "IAMStackName", "InstanceType", "UserKeys", "SecurityGroup", "Subnets", "ENIPrivateAddresses" ]
+        "Parameters"                    : [ "IAMStackName", "InstanceType", "UserKeys", "SecurityGroup", "Subnets" ]
       },
       {
         "Label"                         : { "default" : "Autoscale Config" },
@@ -20,7 +20,6 @@
         "UserKeys"                      : { "default" : "Instance PEM keys" },
         "SecurityGroup"                 : { "default" : "Instance security group" },
         "Subnets"                       : { "default" : "VPC subnets" },
-        "ENIPrivateAddresses"           : { "default" : "ENI IP addresses" },
         "DesiredCapacity"               : { "default" : "Desired number of instnces" },
         "MaxSize"                       : { "default" : "Max size of ASG" },
         "MinSize"                       : { "default" : "Min size of ASG" },
@@ -60,24 +59,22 @@
         "Type"                          : "List<AWS::EC2::Subnet::Id>",
         "Description"                   : "Subnet Ids for your VPC subnets."
     },
-    "ENIPrivateAddresses" : {
-        "Type"                          : "CommaDelimitedList",
-        "Default"                       : "10.79.0.15, 10.79.0.115",
-        "Description"                   : "Network Interface private IP addresses."
-    },
     "DesiredCapacity" : {
         "Type"                          : "Number",
         "Default"                       : "2",
+        "AllowedValues"                 : ["2", "4"],
         "Description"                   : "Number of instances that should be running."
     },
     "MaxSize" : {
         "Type"                          : "Number",
         "Default"                       : "2",
+        "AllowedValues"                 : ["2", "4"],
         "Description"                   : "Maximum size of the autoscale group."
     },
     "MinSize" : {
         "Type"                          : "Number",
         "Default"                       : "2",
+        "AllowedValues"                 : ["2", "4"],
         "Description"                   : "Minimum size of the autoscale group."
     },
     "ScalingAdjUp" : {
@@ -102,13 +99,26 @@
     }
   },
 
- "Mappings" : {
+  "Conditions" : {
+
+    "NetworkInterfaces4" : {
+        "Fn::Equals" : [ { "Ref" : "MaxSize" }, "4" ]
+    }
+  },
+
+  "Mappings" : {
 
     "AmazonLinux" : {
-        "us-east-1"                     : { "HVM" : "ami-c58c1dd3" },
-        "eu-west-1"                     : { "HVM" : "ami-01ccc867" },
-        "ap-northeast-1"                : { "HVM" : "ami-923d12f5" },
-        "us-west-2"                     : { "HVM" : "ami-4836a428" }
+      "us-east-1"                     : { "HVM" : "ami-c58c1dd3" },
+      "eu-west-1"                     : { "HVM" : "ami-01ccc867" },
+      "ap-northeast-1"                : { "HVM" : "ami-923d12f5" },
+      "us-west-2"                     : { "HVM" : "ami-4836a428" }
+    },
+    "PrivateIP" : {
+      "ENI01"                         : { "IP" : "10.79.0.15" },
+      "ENI02"                         : { "IP" : "10.79.0.115" },
+      "ENI03"                         : { "IP" : "10.79.0.16" },
+      "ENI04"                         : { "IP" : "10.79.0.116" }
     }
   },
 
@@ -119,7 +129,7 @@
       "Properties" : {
         "Description"                   : "test interface 01",
         "SubnetId"                      : { "Fn::Select" : [ "0", {"Ref" : "Subnets"} ] },
-        "PrivateIpAddress"              : { "Fn::Select" : [ "0", {"Ref" : "ENIPrivateAddresses"} ] },
+        "PrivateIpAddress"              : { "Fn::FindInMap" : [ "PrivateIP", "ENI01", "IP" ] },
         "Tags": [
             { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
             { "Key" : "Name",  "Value" : "todd-test" }
@@ -131,7 +141,33 @@
       "Properties" : {
         "Description"                   : "test interface 02",
         "SubnetId"                      : { "Fn::Select" : [ "1", {"Ref" : "Subnets"} ] },
-        "PrivateIpAddress"              : { "Fn::Select" : [ "1", {"Ref" : "ENIPrivateAddresses"} ] },
+        "PrivateIpAddress"              : { "Fn::FindInMap" : [ "PrivateIP", "ENI02", "IP" ] },
+        "Tags": [
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name",  "Value" : "todd-test" }
+        ]
+      }
+    },
+    "ec2eniTest03" : {
+      "Type" : "AWS::EC2::NetworkInterface",
+      "Condition" : "NetworkInterfaces4",
+      "Properties" : {
+        "Description"                   : "test interface 03",
+        "SubnetId"                      : { "Fn::Select" : [ "0", {"Ref" : "Subnets"} ] },
+        "PrivateIpAddress"              : { "Fn::FindInMap" : [ "PrivateIP", "ENI03", "IP" ] },
+        "Tags": [
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name",  "Value" : "todd-test" }
+        ]
+      }
+    },
+    "ec2eniTest04" : {
+      "Type" : "AWS::EC2::NetworkInterface",
+      "Condition" : "NetworkInterfaces4",
+      "Properties" : {
+        "Description"                   : "test interface 04",
+        "SubnetId"                      : { "Fn::Select" : [ "1", {"Ref" : "Subnets"} ] },
+        "PrivateIpAddress"              : { "Fn::FindInMap" : [ "PrivateIP", "ENI04", "IP" ] },
         "Tags": [
             { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
             { "Key" : "Name",  "Value" : "todd-test" }
@@ -154,6 +190,34 @@
     },
     "ec2ebsVolume02" : {
       "Type" : "AWS::EC2::Volume",
+      "Properties" : {
+        "Size"				: "10",
+        "Encrypted"			: "true",
+        "KmsKeyId"			: { "Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKey" } },
+        "AvailabilityZone"		: { "Fn::Select" : [ "1", { "Fn::GetAZs": "" } ] },
+        "Tags" : [ 
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name", "Value" : "todd-test" }
+        ]
+      }
+    },
+    "ec2ebsVolume03" : {
+      "Type" : "AWS::EC2::Volume",
+      "Condition" : "NetworkInterfaces4",
+      "Properties" : {
+        "Size"				: "10",
+        "Encrypted"			: "true",
+        "KmsKeyId"			: { "Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKey" } },
+        "AvailabilityZone"		: { "Fn::Select" : [ "0", { "Fn::GetAZs": "" } ] },
+        "Tags" : [ 
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name", "Value" : "todd-test" }
+        ]
+      }
+    },
+    "ec2ebsVolume04" : {
+      "Type" : "AWS::EC2::Volume",
+      "Condition" : "NetworkInterfaces4",
       "Properties" : {
         "Size"				: "10",
         "Encrypted"			: "true",
