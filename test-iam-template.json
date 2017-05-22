@@ -1,0 +1,147 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Creates IAM and KMS resources.",
+
+  "Resources" : {
+
+    "kmsEBSKey" : {  
+      "Type" : "AWS::KMS::Key",
+      "DependsOn" : [ "iamTestRole" ],
+      "Properties" : {  
+        "Description" : "EBS Volume Key",
+        "KeyPolicy" : {  
+          "Version" : "2012-10-17",
+          "Id" : "ebs-vol",
+          "Statement" : [  
+             {
+               "Sid": "Enable IAM User Permissions",
+               "Effect": "Allow",
+               "Principal": {
+                 "AWS" : { "Fn::Join" : [ "", [ "arn:aws:iam::", { "Ref" : "AWS::AccountId" }, ":root" ] ] }
+               },
+               "Action": "kms:*",
+               "Resource": "*"
+             },
+             {  
+                "Sid" : "Allow access through EBS",
+                "Effect" : "Allow",
+                "Principal" : {  
+                   "AWS" : {"Fn::GetAtt" : ["iamTestRole", "Arn"] }
+                },
+                "Action" : [  
+                   "kms:Encrypt",
+                   "kms:Decrypt",
+                   "kms:ReEncrypt*",
+                   "kms:CreateGrant",
+                   "kms:RevokeGrant",
+                   "kms:ListGrants",
+                   "kms:GenerateDataKey*",
+                   "kms:DescribeKey"
+                ],
+                "Resource" : "*",
+                "Condition" : {  
+                   "StringEquals" : {  
+                      "kms:ViaService" : { "Fn::Join" : [ ".", [ "ec2", { "Ref" : "AWS::Region" }, "amazonaws.com" ] ] }
+                   }
+                }
+             },
+             {
+                "Sid": "Allow access for Key Administrators",
+                "Effect": "Allow",
+                "Principal": {
+                  "AWS" : { "Fn::Join" : [ "", [ "arn:aws:iam::", { "Ref" : "AWS::AccountId" }, ":root" ] ] }
+                },
+                "Action": [
+                   "kms:Create*",
+                   "kms:Describe*",
+                   "kms:Enable*",
+                   "kms:List*",
+                   "kms:Put*",
+                   "kms:Update*",
+                   "kms:Revoke*",
+                   "kms:Disable*",
+                   "kms:Get*",
+                   "kms:Delete*",
+                   "kms:TagResource",
+                   "kms:UntagResource",
+                   "kms:ScheduleKeyDeletion",
+                   "kms:CancelKeyDeletion"
+                ],
+                "Resource": "*"
+              }
+           ]
+         }
+       }
+    },
+
+    "kmsKeyAlias" : {
+      "Type" : "AWS::KMS::Alias",
+      "DependsOn" : [ "kmsEBSKey" ],
+      "Properties" : {
+        "AliasName" : "alias/ebs-vol",
+        "TargetKeyId" : { "Ref" : "kmsEBSKey" }
+      }
+    },
+
+    "iamTestRole" : {
+      "Type" : "AWS::IAM::Role",
+      "Properties" : {
+        "AssumeRolePolicyDocument" : {
+        "Version" : "2012-10-17",
+        "Statement" : [ {
+          "Effect" : "Allow",
+          "Principal" : {
+          "Service" : [ "ec2.amazonaws.com" ]
+          },
+        "Action" : [ "sts:AssumeRole" ]
+        } ]
+      },
+      "Path" : "/"
+      }
+    },
+
+    "iamRolePolicies" : {
+      "Type" : "AWS::IAM::Policy",
+      "Properties" : {
+        "PolicyName" : "todd-test-policy",
+        "PolicyDocument" : {
+        "Version" : "2012-10-17",
+        "Statement" : [ {
+          "Effect" : "Allow",
+          "Action" : [ "ec2:AttachNetworkInterface", 
+                       "ec2:DescribeNetworkInterfaces",
+                       "ec2:DescribeVolumes",
+                       "ec2:AttachVolume",
+                       "autoscaling:Describe*",
+                       "cloudwatch:*",
+                       "logs:*"
+                     ],
+          "Resource" : "*"
+        } ]
+      },
+        "Roles" : [ { "Ref" : "iamTestRole" } ]
+      }
+    },
+
+    "iamTestInstanceProfile" : {
+      "Type" : "AWS::IAM::InstanceProfile",
+      "Properties" : {
+        "Path" : "/",
+        "Roles" : [ { "Ref" : "iamTestRole" } ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "TestInstanceProfile" : {
+      "Description" : "Test Instance Profile",
+      "Value" :  { "Ref" : "iamTestInstanceProfile" },
+      "Export" : { "Name" : { "Fn::Sub" : "${AWS::StackName}-InstanceProfile" } }
+    },
+    "EBSKey" : {
+      "Description" : "KMS CMK for EBS Volumes",
+      "Value" :  { "Ref" : "kmsEBSKey" },
+      "Export" : { "Name" : { "Fn::Sub" : "${AWS::StackName}-EBSKey" } }
+    }
+  }
+}

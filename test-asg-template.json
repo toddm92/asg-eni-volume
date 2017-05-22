@@ -1,0 +1,304 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Creates an ASG with instances that attach a second network interface and EBS volume.",
+
+  "Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+    "ParameterGroups" : [
+      {
+        "Label"                         : { "default" : "Instance Config" },
+        "Parameters"                    : [ "IAMStackName", "InstanceType", "UserKeys", "SecurityGroup", "Subnets", "ENIPrivateAddresses" ]
+      },
+      {
+        "Label"                         : { "default" : "Autoscale Config" },
+        "Parameters"                    : [ "DesiredCapacity", "MaxSize", "MinSize", "ScalingAdjUp", "ScalingAdjDn", "ThresholdLow", "ThresholdHigh" ]
+      }
+    ],
+    "ParameterLabels" : {
+        "IAMStackName"                  : { "default" : "Stack containing IAM/KMS resources" },
+        "InstanceType"                  : { "default" : "Instance type" },
+        "UserKeys"                      : { "default" : "Instance PEM keys" },
+        "SecurityGroup"                 : { "default" : "Instance security group" },
+        "Subnets"                       : { "default" : "VPC subnets" },
+        "ENIPrivateAddresses"           : { "default" : "ENI IP addresses" },
+        "DesiredCapacity"               : { "default" : "Desired number of instnces" },
+        "MaxSize"                       : { "default" : "Max size of ASG" },
+        "MinSize"                       : { "default" : "Min size of ASG" },
+        "ScalingAdjUp"                  : { "default" : "Scale up by" },
+        "ScalingAdjDn"                  : { "default" : "Scale down by" },
+        "ThresholdLow"                  : { "default" : "Alram threshold low" },
+        "ThresholdHigh"                 : { "default" : "Alarm threshold high" }
+      }
+    }
+  },
+
+  "Parameters" : {
+
+    "IAMStackName" : {
+      "Type"				: "String",
+      "Default"				: "todd-test-iam",
+      "AllowedPattern"			: "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "MinLength"			: 1,
+      "MaxLength"			: 255,
+      "Description"			: "Name of the CFN stack containing our IAM and KMS resources."
+    },
+    "InstanceType" : {
+        "Type"                          : "String",
+        "Default"                       : "t2.micro",
+        "AllowedValues"                 : ["t2.micro", "t2.small", "t2.medium", "t2.large"],
+        "Description"                   : "Instance type and size."
+    },
+    "UserKeys" : {
+        "Type"                          : "AWS::EC2::KeyPair::KeyName",
+        "Description"                   : "Your instance key pair name."
+    },
+    "SecurityGroup" : {
+        "Type"                          : "AWS::EC2::SecurityGroup::Id",
+        "Description"                   : "Instance security group."
+    },
+    "Subnets" : {
+        "Type"                          : "List<AWS::EC2::Subnet::Id>",
+        "Description"                   : "Subnet Ids for your VPC subnets."
+    },
+    "ENIPrivateAddresses" : {
+        "Type"                          : "CommaDelimitedList",
+        "Default"                       : "10.79.0.15, 10.79.0.115",
+        "Description"                   : "Network Interface private IP addresses."
+    },
+    "DesiredCapacity" : {
+        "Type"                          : "Number",
+        "Default"                       : "2",
+        "Description"                   : "Number of instances that should be running."
+    },
+    "MaxSize" : {
+        "Type"                          : "Number",
+        "Default"                       : "2",
+        "Description"                   : "Maximum size of the autoscale group."
+    },
+    "MinSize" : {
+        "Type"                          : "Number",
+        "Default"                       : "2",
+        "Description"                   : "Minimum size of the autoscale group."
+    },
+    "ScalingAdjUp" : {
+        "Type"                          : "Number",
+        "Default"                       : "2",
+        "Description"                   : "Number of instances by which to scale up."
+    },
+    "ScalingAdjDn" : {
+        "Type"                          : "Number",
+        "Default"                       : "-2",
+        "Description"                   : "Number of instances by which to scale down."
+    },
+    "ThresholdLow" : {
+        "Type"                          : "Number",
+        "Default"                       : "1",
+        "Description"                   : "Low threshold for CloudWatch alarm."
+    },
+    "ThresholdHigh" : {
+        "Type"                          : "Number",
+        "Default"                       : "2",
+        "Description"                   : "High threshold for CloudWatch alarm."
+    }
+  },
+
+ "Mappings" : {
+
+    "AmazonLinux" : {
+        "us-east-1"                     : { "HVM" : "ami-c58c1dd3" },
+        "eu-west-1"                     : { "HVM" : "ami-01ccc867" },
+        "ap-northeast-1"                : { "HVM" : "ami-923d12f5" },
+        "us-west-2"                     : { "HVM" : "ami-4836a428" }
+    }
+  },
+
+  "Resources" : {
+
+    "ec2eniTest01" : {
+      "Type" : "AWS::EC2::NetworkInterface",
+      "Properties" : {
+        "Description"                   : "test interface 01",
+        "SubnetId"                      : { "Fn::Select" : [ "0", {"Ref" : "Subnets"} ] },
+        "PrivateIpAddress"              : { "Fn::Select" : [ "0", {"Ref" : "ENIPrivateAddresses"} ] },
+        "Tags": [
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name",  "Value" : "todd-test" }
+        ]
+      }
+    },
+    "ec2eniTest02" : {
+      "Type" : "AWS::EC2::NetworkInterface",
+      "Properties" : {
+        "Description"                   : "test interface 02",
+        "SubnetId"                      : { "Fn::Select" : [ "1", {"Ref" : "Subnets"} ] },
+        "PrivateIpAddress"              : { "Fn::Select" : [ "1", {"Ref" : "ENIPrivateAddresses"} ] },
+        "Tags": [
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name",  "Value" : "todd-test" }
+        ]
+      }
+    },
+
+    "ec2ebsVolume01" : {
+      "Type" : "AWS::EC2::Volume",
+      "Properties" : {
+        "Size"				: "10",
+        "Encrypted"			: "true",
+        "KmsKeyId"			: { "Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKey" } },
+        "AvailabilityZone"		: { "Fn::Select" : [ "0", { "Fn::GetAZs": "" } ] },
+        "Tags" : [ 
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name", "Value" : "todd-test" }
+        ]
+      }
+    },
+    "ec2ebsVolume02" : {
+      "Type" : "AWS::EC2::Volume",
+      "Properties" : {
+        "Size"				: "10",
+        "Encrypted"			: "true",
+        "KmsKeyId"			: { "Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKey" } },
+        "AvailabilityZone"		: { "Fn::Select" : [ "1", { "Fn::GetAZs": "" } ] },
+        "Tags" : [ 
+            { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+            { "Key" : "Name", "Value" : "todd-test" }
+        ]
+      }
+    },
+
+    "alcServerlaunch" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "DependsOn" : [ "ec2eniTest01", "ec2eniTest02", "ec2ebsVolume01", "ec2ebsVolume02" ],
+      "Properties" : {
+        "ImageId"                       : { "Fn::FindInMap" : [ "AmazonLinux", { "Ref" : "AWS::Region" }, "HVM" ] },
+        "KeyName"                       : { "Ref" : "UserKeys" },
+        "InstanceType"                  : { "Ref" : "InstanceType" },
+        "SecurityGroups"                : [ { "Ref" : "SecurityGroup" } ],
+        "IamInstanceProfile"            : { "Ref" : "iamTestInstanceProfile" },
+        "IamInstanceProfile"            : { "Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-InstanceProfile" } },
+        "AssociatePublicIpAddress"      : "true",
+        "UserData" : {
+          "Fn::Base64" : {
+            "Fn::Join" : [ "",
+            [ " #!/bin/bash -ex", "\n",
+              " #yum update -y", "\n",
+
+              " export TAG='todd-test'", "\n",
+              " export REGION=", {"Ref" : "AWS::Region"}, "\n",
+              " export MAC=`curl -s http://169.254.169.254/latest/meta-data/mac/`", "\n",
+              " export SUB=`curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/subnet-id/`", "\n",
+              " export AZ=`curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone`", "\n",
+              " export INST=`curl -s http://169.254.169.254/latest/meta-data/instance-id`", "\n",
+
+              " export ENI=`aws ec2 describe-network-interfaces ",
+              "      --region $REGION ",
+              "      --filters Name=status,Values=available ",
+              "                Name=subnet-id,Values=$SUB ",
+              "                Name=tag:Name,Values=$TAG ",
+              "      --query 'NetworkInterfaces[0].NetworkInterfaceId' | sed -e 's/\"//g'`", "\n",
+
+              " if [ $ENI != null ]; then", "\n",
+              "   aws ec2 attach-network-interface ",
+              "      --region $REGION ",
+              "      --instance-id $INST ",
+              "      --device-index 2 ",
+              "      --network-interface-id $ENI", "\n",
+              " fi", "\n",
+
+              " export VOL=`aws ec2 describe-volumes ",
+              "      --region $REGION ",
+              "      --filters Name=status,Values=available ",
+              "                Name=availability-zone,Values=$AZ ",
+              "                Name=tag:Name,Values=$TAG ",
+              "       --query 'Volumes[0].VolumeId' | sed -e 's/\"//g'`", "\n",
+
+              " if [ $VOL != null ]; then", "\n",
+              "   aws ec2 attach-volume ",
+              "      --region $REGION ",
+              "      --instance-id $INST ",
+              "      --device /dev/sdf ",
+              "      --volume-id $VOL", "\n",
+              " fi", "\n" ]
+            ]
+          }
+        }
+      }
+    },
+
+    "asgServergroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "VPCZoneIdentifier"             : { "Ref" : "Subnets" },
+        "Cooldown"                      : "120",
+        "DesiredCapacity"               : { "Ref" : "DesiredCapacity" },
+        "MaxSize"                       : { "Ref" : "MaxSize" },
+        "MinSize"                       : { "Ref" : "MinSize" },
+        "HealthCheckType"               : "EC2",
+        "HealthCheckGracePeriod"        : "180",
+        "LaunchConfigurationName"       : { "Ref" : "alcServerlaunch" },
+        "Tags": [
+          { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName" }, "PropagateAtLaunch" : true },
+          { "Key" : "Name", "Value"  : "todd-test", "PropagateAtLaunch" : true }
+        ]
+      }
+    },
+
+    "aspServerscaleUP" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "DependsOn" : [ "asgServergroup" ],
+      "Properties" : {
+      "AdjustmentType"                  : "ChangeInCapacity",
+      "AutoScalingGroupName"            : { "Ref" : "asgServergroup" },
+      "Cooldown"                        : "300",
+      "ScalingAdjustment"               : { "Ref" : "ScalingAdjUp" }
+      }
+    },
+    "aspServerscaleDN" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "DependsOn" : [ "asgServergroup" ],
+      "Properties" : {
+      "AdjustmentType"                  : "ChangeInCapacity",
+      "AutoScalingGroupName"            : { "Ref" : "asgServergroup" },
+      "ScalingAdjustment"               : { "Ref" : "ScalingAdjDn" }
+      }
+    },
+
+    "monServeralarmLow" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "asgServergroup", "aspServerscaleUP" ],
+      "Properties" : {
+      "MetricName"                      : "HealthyHostCount",
+      "Namespace"                       : "AWS/EC2",
+      "Statistic"                       : "Maximum",
+      "Period"                          : "60",
+      "EvaluationPeriods"               : "2",
+      "Threshold"                       : { "Ref" : "ThresholdLow" },
+      "AlarmActions"                    : [ { "Ref" : "aspServerscaleUP" } ],
+      "Dimensions"                      : [ { "Name": "AutoScalingGroupName", "Value": { "Ref": "asgServergroup" } } ],
+      "ComparisonOperator"              : "LessThanOrEqualToThreshold"
+      }
+    },
+    "monServeralarmHigh" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "asgServergroup", "aspServerscaleDN" ],
+      "Properties" : {
+      "MetricName"                      : "HealthyHostCount",
+      "Namespace"                       : "AWS/EC2",
+      "Statistic"                       : "Maximum",
+      "Period"                          : "60",
+      "EvaluationPeriods"               : "2",
+      "Threshold"                       : { "Ref" : "ThresholdHigh" },
+      "AlarmActions"                    : [ { "Ref" : "aspServerscaleDN" } ],
+      "Dimensions"                      : [ { "Name": "AutoScalingGroupName", "Value": { "Ref": "asgServergroup" } } ],
+      "ComparisonOperator"              : "GreaterThanOrEqualToThreshold"
+      }
+    }
+  },
+
+  "Outputs" : {
+    "asGroupName" : {
+      "Description"                     : "Autoscale group name",
+      "Value"                           : { "Ref" : "asgServergroup" }
+    }
+  }
+}
