@@ -20,7 +20,7 @@
             "Resource":"*",
             "Condition":{  
                "StringEquals":{  
-                  "kms:CallerAccount":"762160981991",
+                  "kms:CallerAccount":"123456789012",
                   "kms:ViaService":"ec2.us-east-1.amazonaws.com"
                }
             }
@@ -29,7 +29,7 @@
             "Sid":"Allow direct access to key metadata to the account",
             "Effect":"Allow",
             "Principal":{  
-               "AWS":"arn:aws:iam::762160981991:root"
+               "AWS":"arn:aws:iam::123456789012:root"
             },
             "Action":[  
                "kms:Describe*",
