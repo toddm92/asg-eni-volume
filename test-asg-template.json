@@ -109,7 +109,8 @@
   "Mappings" : {
 
     "AmazonLinux" : {
-      "us-east-1"                     : { "HVM" : "ami-c58c1dd3" },
+      "us-east-1"                     : { "HVM" : "ami-057e3f13" },
+      "us-east-2"                     : { "HVM" : "ami-c58c1dd3" },
       "eu-west-1"                     : { "HVM" : "ami-01ccc867" },
       "ap-northeast-1"                : { "HVM" : "ami-923d12f5" },
       "us-west-2"                     : { "HVM" : "ami-4836a428" }
@@ -245,8 +246,9 @@
           "Fn::Base64" : {
             "Fn::Join" : [ "",
             [ " #!/bin/bash -ex", "\n",
+              " yum update -y aws-cfn-bootstrap", "\n",
 
-              " #### CloudWatch monitoring", "\n",
+              " # Setup CloudWatch disk monitoring", "\n",
               " yum install -y perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https", "\n",
               " cd ~ec2-user", "\n",
               " curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O", "\n",
@@ -256,7 +258,7 @@
               "      --disk-space-util --disk-space-used --disk-space-avail --disk-path=/' ",
               "      > /tmp/crontab.txt", "\n",
               " sudo -u ec2-user bash -c 'crontab /tmp/crontab.txt'", "\n",
-              " ####", "\n",
+              " #", "\n",
 
               " export TAG='todd-test'", "\n",
               " export REGION=", {"Ref" : "AWS::Region"}, "\n",
@@ -272,6 +274,7 @@
               "                Name=tag:Name,Values=$TAG ",
               "      --query 'NetworkInterfaces[0].NetworkInterfaceId' | sed -e 's/\"//g'`", "\n",
 
+              " # Look for available ENI", "\n",
               " if [ $ENI != null ]; then", "\n",
               "   aws ec2 attach-network-interface ",
               "      --region $REGION ",
@@ -287,13 +290,19 @@
               "                Name=tag:Name,Values=$TAG ",
               "       --query 'Volumes[0].VolumeId' | sed -e 's/\"//g'`", "\n",
 
+              " # Look for available EBS volume", "\n",
               " if [ $VOL != null ]; then", "\n",
               "   aws ec2 attach-volume ",
               "      --region $REGION ",
               "      --instance-id $INST ",
               "      --device /dev/sdf ",
               "      --volume-id $VOL", "\n",
-              " fi", "\n" ]
+              " fi", "\n",
+
+              " # Send a success signal", "\n",
+              "/opt/aws/bin/cfn-signal -e 0 --stack ", { "Ref": "AWS::StackName" },
+                                          " --resource asgServergroup", "\n"
+              ]
             ]
           }
         }
@@ -315,6 +324,20 @@
           { "Key" : "Stack", "Value" : { "Ref" : "AWS::StackName" }, "PropagateAtLaunch" : true },
           { "Key" : "Name", "Value"  : "todd-test", "PropagateAtLaunch" : true }
         ]
+      },
+      "CreationPolicy" : {
+        "ResourceSignal" : {
+        "Count"                         : { "Ref" : "DesiredCapacity" },
+        "Timeout"                       : "PT5M"
+        }
+      },
+      "UpdatePolicy" : {
+        "AutoScalingRollingUpdate" : {
+          "MinInstancesInService"       : { "Ref" : "MinSize" }, 
+          "MaxBatchSize"                : "2",
+          "PauseTime"                   : "PT5M",
+          "WaitOnResourceSignals"       : "true"
+        }
       }
     },
 
