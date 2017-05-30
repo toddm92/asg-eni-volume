@@ -183,6 +183,7 @@
 
     "ec2ebsVolume01" : {
       "Type" : "AWS::EC2::Volume",
+      "DeletionPolicy" : "Retain",
       "Properties" : {
         "Size"				: "10",
         "Encrypted"			: "true",
@@ -196,6 +197,7 @@
     },
     "ec2ebsVolume02" : {
       "Type" : "AWS::EC2::Volume",
+      "DeletionPolicy" : "Retain",
       "Properties" : {
         "Size"				: "10",
         "Encrypted"			: "true",
@@ -210,6 +212,7 @@
     "ec2ebsVolume03" : {
       "Type" : "AWS::EC2::Volume",
       "Condition" : "NetworkInterfaces4",
+      "DeletionPolicy" : "Retain",
       "Properties" : {
         "Size"				: "10",
         "Encrypted"			: "true",
@@ -224,6 +227,7 @@
     "ec2ebsVolume04" : {
       "Type" : "AWS::EC2::Volume",
       "Condition" : "NetworkInterfaces4",
+      "DeletionPolicy" : "Retain",
       "Properties" : {
         "Size"				: "10",
         "Encrypted"			: "true",
@@ -244,7 +248,6 @@
         "KeyName"                       : { "Ref" : "UserKeys" },
         "InstanceType"                  : { "Ref" : "InstanceType" },
         "SecurityGroups"                : [ { "Ref" : "SecurityGroup" } ],
-        "IamInstanceProfile"            : { "Ref" : "iamTestInstanceProfile" },
         "IamInstanceProfile"            : { "Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-InstanceProfile" } },
         "AssociatePublicIpAddress"      : "true",
         "UserData" : {
@@ -267,42 +270,48 @@
 
               " export TAG='todd-test'", "\n",
               " export REGION=", {"Ref" : "AWS::Region"}, "\n",
-              " export MAC=`curl -s http://169.254.169.254/latest/meta-data/mac/`", "\n",
-              " export SUB=`curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/subnet-id/`", "\n",
-              " export AZ=`curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone`", "\n",
-              " export INST=`curl -s http://169.254.169.254/latest/meta-data/instance-id`", "\n",
+              " export MAC=$(curl -s http://169.254.169.254/latest/meta-data/mac/)", "\n",
+              " export SUB=$(curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/subnet-id/)", "\n",
+              " export AZ=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)", "\n",
+              " export INST=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)", "\n",
 
-              " export ENI=`aws ec2 describe-network-interfaces ",
+              " function get_eni {", "\n",
+              "   export ENI=$(aws ec2 describe-network-interfaces ",
               "      --region $REGION ",
               "      --filters Name=status,Values=available ",
               "                Name=subnet-id,Values=$SUB ",
               "                Name=tag:Name,Values=$TAG ",
-              "      --query 'NetworkInterfaces[0].NetworkInterfaceId' | sed -e 's/\"//g'`", "\n",
+              "      --query 'NetworkInterfaces[0].NetworkInterfaceId' | sed -e 's/\"//g')", "\n",
+              " }", "\n",
 
               " # Look for available ENI", "\n",
-              " if [ $ENI != null ]; then", "\n",
-              "   aws ec2 attach-network-interface ",
+              " get_eni", "\n",
+              " while [[ $ENI != eni-* ]]; do sleep 10; get_eni; done", "\n",
+
+              " aws ec2 attach-network-interface ",
               "      --region $REGION ",
               "      --instance-id $INST ",
               "      --device-index 2 ",
               "      --network-interface-id $ENI", "\n",
-              " fi", "\n",
 
-              " export VOL=`aws ec2 describe-volumes ",
+              " function get_vol {", "\n",
+              "   export VOL=$(aws ec2 describe-volumes ",
               "      --region $REGION ",
               "      --filters Name=status,Values=available ",
               "                Name=availability-zone,Values=$AZ ",
               "                Name=tag:Name,Values=$TAG ",
-              "       --query 'Volumes[0].VolumeId' | sed -e 's/\"//g'`", "\n",
+              "      --query 'Volumes[0].VolumeId' | sed -e 's/\"//g')", "\n",
+              " }", "\n",
 
               " # Look for available EBS volume", "\n",
-              " if [ $VOL != null ]; then", "\n",
-              "   aws ec2 attach-volume ",
+              " get_vol", "\n",
+              " while [[ $VOL != vol-* ]]; do sleep 10; get_vol; done", "\n",
+
+              " aws ec2 attach-volume ",
               "      --region $REGION ",
               "      --instance-id $INST ",
               "      --device /dev/sdf ",
               "      --volume-id $VOL", "\n",
-              " fi", "\n",
 
               " # Send a success signal", "\n",
               "/opt/aws/bin/cfn-signal -e 0 --stack ", { "Ref": "AWS::StackName" },
@@ -318,7 +327,7 @@
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
         "VPCZoneIdentifier"             : { "Ref" : "Subnets" },
-        "Cooldown"                      : "120",
+        "Cooldown"                      : "300",
         "DesiredCapacity"               : { "Ref" : "DesiredCapacity" },
         "MaxSize"                       : { "Ref" : "MaxSize" },
         "MinSize"                       : { "Ref" : "MinSize" },
@@ -333,14 +342,14 @@
       "CreationPolicy" : {
         "ResourceSignal" : {
         "Count"                         : { "Ref" : "DesiredCapacity" },
-        "Timeout"                       : "PT5M"
+        "Timeout"                       : "PT10M"
         }
       },
       "UpdatePolicy" : {
         "AutoScalingRollingUpdate" : {
           "MinInstancesInService"       : { "Ref" : "MinSize" }, 
           "MaxBatchSize"                : "2",
-          "PauseTime"                   : "PT5M",
+          "PauseTime"                   : "PT10M",
           "WaitOnResourceSignals"       : "true"
         }
       }
