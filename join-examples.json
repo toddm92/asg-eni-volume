@@ -1,3 +1,0 @@
-{ "Fn::Join" : [ ".", [ "ec2", { "Ref" : "AWS::Region" }, "amazonaws.com" ] ] }
-
-"AWS" : { "Fn::Join" : [ "", [ "\"arn:aws:iam::", { "Ref" : "AWS::AccountId" }, ":root\"" ] ] }
