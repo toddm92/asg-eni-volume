@@ -103,15 +103,20 @@
     "iamRolePolicies" : {
       "Type" : "AWS::IAM::Policy",
       "Properties" : {
-        "PolicyName" : "todd-test-policy",
+        "PolicyName" : "zook-test-policy",
         "PolicyDocument" : {
         "Version" : "2012-10-17",
         "Statement" : [ {
           "Effect" : "Allow",
-          "Action" : [ "ec2:AttachNetworkInterface", 
+          "Action" : [
+                       "ec2:AttachNetworkInterface",
                        "ec2:DescribeNetworkInterfaces",
+                       "ec2:CreateNetworkInterface",
                        "ec2:DescribeVolumes",
                        "ec2:AttachVolume",
+                       "ec2:CreateVolume",
+                       "ec2:DescribeSubnets",
+                       "ec2:CreateTags",
                        "autoscaling:Describe*",
                        "cloudwatch:*",
                        "logs:*"
