@@ -50,6 +50,7 @@ function create_vol() {
 }
 
 function attach_vol() {
+    # Requires one arg, an EBS volume_id
     aws ec2 attach-volume \
        --region $REGION \
        --instance-id $INST \
@@ -60,6 +61,7 @@ function attach_vol() {
 }
 
 function create_alarm() {
+    # Requires two args, $FILE_SYS and $MOUNT_PATH 
     aws cloudwatch put-metric-alarm \
        --region $REGION \
        --alarm-name "zookeeper-disk-$INST" \
@@ -77,6 +79,7 @@ function create_alarm() {
 }
 
 function tag_it() {
+    # Requires one arg, an AWS resource_id
     aws ec2 create-tags --resources $1 --tags Key=Service,Value=$SERVICE --region $REGION
 }
 
@@ -119,9 +122,10 @@ chown -R ubuntu:ubuntu /evident
 # Add an entry to fstab for this volume
 echo "$FILE_SYS    $MOUNT_PATH         ext4    noauto,discard  0 0" >> /etc/fstab
 
-# Mount our volume
+# Mount the volume
 mount $MOUNT_PATH
 
+# ** These cmds will have to be baked into the AMI if no Public IP is assigned to the instance **
 # Install AWS disk monitorig utils
 apt-get -y update &> /dev/null
 apt-get -y install unzip &> /dev/null
@@ -132,7 +136,9 @@ curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScript
 
 unzip CloudWatchMonitoringScripts-1.2.1.zip
 rm -f CloudWatchMonitoringScripts-1.2.1.zip
+# **
 
+# Update crontab
 echo "*/5 * * * * ~/aws-scripts-mon/mon-put-instance-data.pl \
     --disk-space-util --disk-space-used --disk-space-avail --disk-path=$MOUNT_PATH"  > /tmp/crontab.txt
 sudo -u ubuntu bash -c 'crontab /tmp/crontab.txt'
