@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # Arguments from the CFN template
-#export REGION="$1"
-#export KMS_KEY_ARN="$2"
-#export TOPIC_ARN="$3"
-#export SERVICE="$4"
+export REGION="$1"
+export KMS_KEY_ARN="$2"
+export TOPIC_ARN="$3"
+export SERVICE="$4"
 
 # For testing
-export REGION="us-east-1"
-export KMS_KEY_ARN="arn:aws:kms:us-east-1:762160981991:key/4f33efbf-fc46-4807-a021-69289f47fd84"
-export TOPIC_ARN="arn:aws:sns:us-east-1:762160981991:zook-test-env-zookeeper"
-export SERVICE="kafka-zookeepers"
+#export REGION="us-east-1"
+#export KMS_KEY_ARN="arn:aws:kms:us-east-1:762160981991:key/4f33efbf-fc46-4807-a021-69289f47fd84"
+#export TOPIC_ARN="arn:aws:sns:us-east-1:762160981991:zook-test-env-zookeeper"
+#export SERVICE="kafka-zookeepers"
 
 export INST=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 export MAC=$(curl -s http://169.254.169.254/latest/meta-data/mac/)
