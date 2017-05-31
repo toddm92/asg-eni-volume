@@ -857,7 +857,7 @@
 
     "alcServerlaunch" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
-      "DependsOn" : [ "ec2InstanceSecurityGroup" ],
+      "DependsOn" : [ "ec2InstanceSecurityGroup", "ec2PublicSubnetRouteTableAssocAZ1", "ec2PublicSubnetRouteTableAssocAZ2", "ec2PublicSubnetRouteTableAssocAZ3" ],
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "config" : {
