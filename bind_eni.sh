@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Arguments from the CFN template
-#export REGION="$1"
-#export SG="$2"
-#export SERVICE="$3"
+export REGION="$1"
+export SG="$2"
+export SERVICE="$3"
 
 # For testing
-export REGION="us-east-1"
-export SG="sg-29330757"
-export SERVICE="kafka-zookeepers"
+#export REGION="us-east-1"
+#export SG="sg-29330757"
+#export SERVICE="kafka-zookeepers"
 
 export INST=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 export MAC=$(curl -s http://169.254.169.254/latest/meta-data/mac/)
