@@ -918,6 +918,13 @@
               "update-rc.d cfn-hup defaults", "\n",
               "service cfn-hup start", "\n",
 
+              "wget https://s3.amazonaws.com/todd-zook-pub/bind_eni.sh", "\n",
+              "wget https://s3.amazonaws.com/todd-zook-pub/bind_ebs.sh", "\n",
+              "chmod +x bind_eni.sh", "\n",
+              "chmod +x bind_ebs.sh", "\n",
+              "./bind_eni.sh ", {"Ref" : "AWS::Region"}, " ", {"Ref" : "ec2InstanceSecurityGroup"}, " ", {"Ref" : "Service"}, "\n",
+              "./bind_ebs.sh ", {"Ref" : "AWS::Region"}, " ", {"Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKeyArn"}}, " ", {"Ref": "snsASTopic"}, " ", {"Ref" : "Service"}, "\n",
+
               "/usr/local/bin/cfn-init",
               " --stack ", { "Ref": "AWS::StackName" },
               " --resource asgServergroup",
@@ -962,14 +969,14 @@
       "CreationPolicy" : {
         "ResourceSignal" : {
         "Count"                         : "3",
-        "Timeout"                       : "PT10M"
+        "Timeout"                       : "PT15M"
         }
       },
       "UpdatePolicy" : {
         "AutoScalingRollingUpdate" : {
           "MinInstancesInService"       : "2", 
           "MaxBatchSize"                : "1",
-          "PauseTime"                   : "PT10M",
+          "PauseTime"                   : "PT15M",
           "WaitOnResourceSignals"       : "true"
         }
       }
