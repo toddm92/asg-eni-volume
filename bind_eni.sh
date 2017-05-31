@@ -45,6 +45,7 @@ function create_eni() {
 }
 
 function attach_eni() {
+    # Requires one arg, a network_interface_id
     local ATTACH_ID=$(aws ec2 attach-network-interface \
        --network-interface-id $1 \
        --instance-id $INST \
@@ -56,6 +57,7 @@ function attach_eni() {
 }
 
 function get_eni_status() {
+    # Requires one arg, a network_interface_id
     local ATTACH_STATUS=$(aws ec2 describe-network-interfaces \
        --network-interface-ids $1 \
        --region $REGION \
@@ -74,6 +76,7 @@ function get_gateway() {
 }
 
 function tag_it() {
+    # Requires one arg, an AWS resource_id
     aws ec2 create-tags --resources $1 --tags Key=Service,Value=$SERVICE --region $REGION
 }
 
