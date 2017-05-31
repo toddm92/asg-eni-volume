@@ -35,7 +35,7 @@
 
     "IAMStackName" : {
       "Type"                            : "String",
-      "Default"                         : "todd-test-iam",
+      "Default"                         : "zook-test-iam",
       "AllowedPattern"                  : "^[a-zA-Z][-a-zA-Z0-9]*$",
       "MinLength"                       : 1,
       "MaxLength"                       : 255,
