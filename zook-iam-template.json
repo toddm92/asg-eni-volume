@@ -147,6 +147,11 @@
       "Description" : "KMS CMK for EBS Volumes",
       "Value" :  { "Ref" : "kmsEBSKey" },
       "Export" : { "Name" : { "Fn::Sub" : "${AWS::StackName}-EBSKey" } }
+    },
+    "EBSKeyArn" : {
+      "Description" : "KMS CMK Arn",
+      "Value" :  { "Fn::GetAtt" : ["kmsEBSKey", "Arn"] },
+      "Export" : { "Name" : { "Fn::Sub" : "${AWS::StackName}-EBSKeyArn" } }
     }
   }
 }
