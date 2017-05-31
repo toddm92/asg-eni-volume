@@ -68,7 +68,7 @@ function get_gateway() {
     local GATEWAY=$(aws ec2 describe-subnets \
        --subnet-ids $SUB \
        --region $REGION \
-       --query 'Subnets[0].Tags[?Key==`Gateway`].Value' | tr -d '[]"')
+       --query 'Subnets[0].Tags[?Key==`Gateway`].Value' | tr -d '\n[]" ')
 
     echo "$GATEWAY"
 }
@@ -98,28 +98,30 @@ until [ $ENI_STATUS == "in-use" ]; do
     ENI_STATUS=$(get_eni_status $ENI_ID)
 done
 
-log_it "Bringing up ens4..."
-ip link set ens4 up
-sleep 1
-ifconfig ens4
+# Second Ethernet interface
+ETH_INT="eth1"
+
+log_it "Bringing up $ETH_INT..."
+ip link set $ETH_INT up
+sleep 5
+ifconfig $ETH_INT
 
 while [ $? != "0" ]; do
     sleep 2
-    ifconfig ens4
+    ifconfig $ETH_INT
 done
 
 # Grab an IP address
-dhclient ens4
+dhclient $ETH_INT
 
 # Create a new route-table
 echo "200 out" >> /etc/iproute2/rt_tables
 
 # Setup routing
-STATIC_IP=$(ifconfig ens4 | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}')
+STATIC_IP=$(ifconfig $ETH_INT | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}')
 GATEWAY=$(get_gateway)
 
 ip rule add from $STATIC_IP table out
 ip route add default via $GATEWAY table out
 
 log_it "IP Address: $STATIC_IP Gateway: $GATEWAY"
-
