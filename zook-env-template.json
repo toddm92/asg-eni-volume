@@ -49,7 +49,7 @@
     },
     "InstanceAMI" : {
         "Type"                          : "AWS::EC2::Image::Id",
-        "Default"                       : "ami-c58c1dd3",
+        "Default"                       : "ami-80861296",
         "Description"                   : "Your instance image."
     },
     "UserKeys" : {
@@ -858,6 +858,46 @@
     "alcServerlaunch" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "DependsOn" : [ "ec2InstanceSecurityGroup" ],
+        "Metadata" : {
+          "AWS::CloudFormation::Init" : {
+            "config" : {
+              "files" : {
+                "/etc/cfn/cfn-hup.conf" : {
+                  "content" : { "Fn::Join" : [ "", [
+                    "[main]\n",
+                    "stack=", { "Ref" : "AWS::StackId" }, "\n",
+                    "region=", { "Ref" : "AWS::Region" }, "\n"
+                  ] ] },
+                  "mode"    : "000400",
+                  "owner"   : "root",
+                  "group"   : "root"
+                },
+                "/etc/cfn/hooks.d/cfn-auto-reloader.conf" : {
+                  "content": { "Fn::Join" : [ "", [
+                    "[cfn-auto-reloader-hook]\n",
+                    "triggers=post.update\n",
+                    "path=Resources.alcServerlaunch.Metadata.AWS::CloudFormation::Init\n",
+                    "action=/opt/aws/bin/cfn-init -v ",
+                    " --stack ", { "Ref" : "AWS::StackName" },
+                    " --resource alcServerlaunch ",
+                    " --region ", { "Ref" : "AWS::Region" }, "\n",
+                    "runas=root\n"
+                  ] ] },
+                  "mode"    : "000400",
+                  "owner"   : "root",
+                  "group"   : "root"
+                }
+              },
+              "services" : {
+                "sysvinit" : {
+                  "cfn-hup" : {
+                    "enabled" : "true",
+                    "ensureRunning" : "true",
+                    "files" : [ "/etc/cfn/cfn-hup.conf", "/etc/cfn/hooks.d/cfn-auto-reloader.conf" ]
+              } } }
+            }
+          }
+        },
       "Properties" : {
         "ImageId"                       : { "Ref" : "InstanceAMI" },
         "KeyName"                       : { "Ref" : "UserKeys" },
@@ -867,25 +907,25 @@
         "AssociatePublicIpAddress"      : "true",
         "UserData" : {
           "Fn::Base64" : {
-            "Fn::Join" : [ "",
-            [ " #!/bin/bash -ex", "\n",
-              " yum update -y aws-cfn-bootstrap", "\n",
+            "Fn::Join" : [ "", [
+              "#!/bin/bash", "\n",
+              "apt-get update", "\n",
+              "apt-get -y install awscli", "\n",
+              "apt-get -y install python-pip", "\n",
+              "pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz", "\n",
+              "cp /usr/local/init/ubuntu/cfn-hup /etc/init.d/cfn-hup", "\n",
+              "chmod +x /etc/init.d/cfn-hup", "\n",
+              "update-rc.d cfn-hup defaults", "\n",
+              "service cfn-hup start", "\n",
 
-              " # Setup CloudWatch disk monitoring", "\n",
-              " yum install -y perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https", "\n",
-              " cd ~ec2-user", "\n",
-              " curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O", "\n",
-              " unzip CloudWatchMonitoringScripts-1.2.1.zip", "\n",
-              " rm -f CloudWatchMonitoringScripts-1.2.1.zip", "\n",
-              " echo '*/5 * * * * ~/aws-scripts-mon/mon-put-instance-data.pl ",
-              "      --disk-space-util --disk-space-used --disk-space-avail --disk-path=/' ",
-              "      > /tmp/crontab.txt", "\n",
-              " sudo -u ec2-user bash -c 'crontab /tmp/crontab.txt'", "\n",
-              " #", "\n",
+              "/usr/local/bin/cfn-init",
+              " --stack ", { "Ref": "AWS::StackName" },
+              " --resource asgServergroup",
+              " --region ", { "Ref": "AWS::Region" }, "\n",
 
-              " # Send a success signal", "\n",
-              "/opt/aws/bin/cfn-signal -e 0 --stack ", { "Ref": "AWS::StackName" },
-                                          " --resource asgServergroup", "\n"
+              "/usr/local/bin/cfn-signal -e 0 --stack ", { "Ref": "AWS::StackName" },
+              " --resource asgServergroup",
+              " --region ", { "Ref": "AWS::Region" }, "\n"
               ]
             ]
           }
