@@ -6,7 +6,7 @@ Autoscale ubuntu instances with a second network interface and EBS volume.  Thre
 ---
 
 * bind_ebs.sh - Locates or creates an EBS volume and sets up disk utilization CloudWatch monitors
-* bind_eni.sh - Locates or creates a second network interface and assigns it an IPv4 IP address
+* bind_eni.sh - Locates or creates a second network interface and assigns it a private IPv4 address
 * test-asg-template.json - (Experimental) ASG template that creates ENI and EBS resources via CFN
 * zook-env-template.json - CFN template that creates a VPC, ASG, and runs the above bash scripts from UserData
 * zook-iam-template.json - CFN template that creates a KMS encryption key and IAM instance profile
