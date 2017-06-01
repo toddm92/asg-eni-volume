@@ -19,3 +19,15 @@ Autoscale ubuntu instances with a second network interface and EBS volume.  Thre
 
 - [x] **Perform a rolling update**  Update the CloudFormation stack with a new AMI. Each instance should be replaced, a single instance at a time, leaving two running instances at all times throughout the process. Like the previous test, each new instance should be deployed into the same availability-zone as the instance being replaced. The new instance should attched the ENI and EBS volume previously attached to the terminated instance.
 
+### Considerations
+
+- [ ] Specifiy how many instances must signal success for an update to succeed. The creation policy below should succeedif a success signal is received from two of the three instances. This needs to be tested.
+
+```
+"CreationPolicy" : {
+   "AutoScalingCreationPolicy" : {
+   "MinSuccessfulInstancesPercent" : 66
+ }
+}
+```
+
