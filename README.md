@@ -31,3 +31,5 @@ Autoscale ubuntu instances with a second network interface and EBS volume.  Thre
 }
 ```
 
+- [ ] Clean up unused CloudWatch disk alarms.
+
