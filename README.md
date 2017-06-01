@@ -21,7 +21,7 @@ Autoscale ubuntu instances with a second network interface and EBS volume.  Thre
 
 ### Considerations
 
-- [ ] Specifiy how many instances must signal success for an update to succeed. The creation policy below should succeedif a success signal is received from two of the three instances. This needs to be tested.
+- [ ] Specifiy how many instances must signal success for an update to succeed. The creation policy snippet below should succeed if a success signal is received from two of the three instances. This needs to be tested.
 
 ```
 "CreationPolicy" : {
