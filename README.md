@@ -15,13 +15,13 @@ Autoscale ubuntu instances with a second network interface and EBS volume.  Thre
 
 ### Tests
 
-- [x] **Shutdown an instance** ASG should launch and replace the terminated instance in the same availability-zone. The new instance should attched the ENI and EBS volume previously attached to the terminated instance.
+- [x] **Shutdown an instance** ASG should launch and replace the terminated instance in the same availability-zone. The new instance should attach the ENI and EBS volume previously attached to the terminated instance.
 
-- [x] **Perform a rolling update**  Update the CloudFormation stack with a new AMI. Each instance should be replaced, a single instance at a time, leaving two running instances at all times throughout the process. Like the previous test, each new instance should be deployed into the same availability-zone as the instance being replaced. The new instance should attched the ENI and EBS volume previously attached to the terminated instance.
+- [x] **Perform a rolling update**  Update the CloudFormation stack with a new AMI. Each instance should be replaced, a single instance at a time, leaving two running instances at all times throughout the process. Like the previous test, each new instance should be deployed into the same availability-zone as the instance being replaced. The new instance should attach the ENI and EBS volume previously attached to the terminated instance.
 
 ### Considerations
 
-- [ ] Specifiy how many instances must signal success for an update to succeed. The creation policy snippet below should succeed if a success signal is received from two of the three instances. This needs to be tested.
+- [ ] Specifiy how many instances must signal success for an update to succeed. The creation policy snippet below should succeed if a success signal is received from 2 of the 3 instances. Two instances are required to bring up the service. This needs to be tested.
 
 ```
 "CreationPolicy" : {
