@@ -917,6 +917,7 @@
               "chmod +x /etc/init.d/cfn-hup", "\n",
               "update-rc.d cfn-hup defaults", "\n",
               "service cfn-hup start", "\n",
+              "sleep 60", "\n",
 
               "wget https://s3.amazonaws.com/todd-zook-pub/bind_eni.sh", "\n",
               "wget https://s3.amazonaws.com/todd-zook-pub/bind_ebs.sh", "\n",
