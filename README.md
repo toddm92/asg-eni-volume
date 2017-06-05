@@ -38,5 +38,5 @@ Autoscale ubuntu instances with a second network interface and EBS volume.  Thre
 * http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/mon-scripts.html
 * http://docs.aws.amazon.com/kms/latest/developerguide/services-ebs.html
 * http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-io-characteristics.html
-* http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-volume-status.html#using_cloudwatch_ebs
+* http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-volume-status.html
 
