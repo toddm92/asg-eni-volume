@@ -114,6 +114,7 @@
                        "ec2:CreateNetworkInterface",
                        "ec2:DescribeVolumes",
                        "ec2:AttachVolume",
+                       "ec2:DetachVolume",
                        "ec2:CreateVolume",
                        "ec2:DescribeSubnets",
                        "ec2:CreateTags",
