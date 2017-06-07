@@ -1,17 +1,19 @@
 # Testing Environment (for Zookeeper)
 
 
-Autoscale ubuntu instances with a second network interface and EBS volume.  Three (and only 3) instances should be running, one per Availability-Zone.
+Autoscale ubuntu instances with a second network interface and EBS volume.  Three (and only 3) instances should be running, one per Availability-Zone.  This can be expaned to run more instances per AZ in groups of 3.
 
----
+Resource | Description
+-------- | ------------
+bind_eni.sh | Locates an existing network interface or creates one if one doesn't already exist matching our criteria.
+bind_ebs.sh | Locates an existing volume or creates one if one doesn't already exist matching our criteria. Sets up disk utilization CloudWatch monitors and alerts.
+ubind_ebs.sh | /ete/init.d script to detach EBS volumes on shutdown.
+zook-asg-template.json | CFN template that creates an ASG and runs the above bash scripts from UserData.
+zook-iam-template.json | CFN template that creates a KMS encryption key and IAM instance profile.
+zook-vpc-template.json | CFN template that creates the infrastructure and VPC.
+test-asg-template.json | (Experimental) ASG template that creates network interfaces and volume resources via the CFN template.
 
-* bind_ebs.sh - Locates or creates an EBS volume and sets up disk utilization CloudWatch monitors
-* bind_eni.sh - Locates or creates a second network interface and assigns it a private IPv4 address
-* test-asg-template.json - (Experimental) ASG template that creates ENI and EBS resources via CFN
-* zook-env-template.json - CFN template that creates a VPC, ASG, and runs the above bash scripts from UserData
-* zook-iam-template.json - CFN template that creates a KMS encryption key and IAM instance profile
-
----
+Note: Launch the VPC and IAM stacks first, followed by the ASG stack last.
 
 ### Tests
 
