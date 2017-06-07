@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description" : "Creates IAM and KMS resources.",
+  "Description" : "Creates IAM instance profile policy and KMS resources.",
 
   "Resources" : {
 
