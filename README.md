@@ -3,6 +3,8 @@
 
 Autoscale ubuntu instances with a second network interface and EBS volume.  Three (and only 3) instances should be running, one per Availability-Zone.  This can be expaned to run more instances per AZ in groups of 3.
 
+### Repo
+
 Resource | Description
 -------- | ------------
 bind_eni.sh | Locates an existing network interface or creates one if one doesn't already exist matching our criteria.
