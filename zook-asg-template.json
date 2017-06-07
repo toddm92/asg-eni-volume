@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description"	: "Test Zookeeper Environment.",
+  "Description"	: "Creates a single ASG environment for launching ubuntu instances across 3 AZs/subnets. Attaches a second EBS Volume and Network Interface via bash scripts in UserData.",
 
   "Metadata" : {
 
@@ -8,11 +8,7 @@
     "ParameterGroups" : [
       {
         "Label"                         : { "default" : "Instance Config" },
-        "Parameters"                    : [ "IAMStackName", "InstanceType", "InstanceAMI", "UserKeys" ]
-      },
-      {
-        "Label"				: { "default" : "Tagging" },
-        "Parameters"			: [ "Service", "StackEnv" ]
+        "Parameters"                    : [ "VPCStackName", "IAMStackName", "InstanceType", "InstanceAMI", "UserKeys" ]
       },
       {
         "Label"                         : { "default" : "Notification" },
@@ -20,12 +16,11 @@
       }
     ],
     "ParameterLabels" : {
+        "VPCStackName"                  : { "default" : "VPC stack" },
         "IAMStackName"                  : { "default" : "Stack containing IAM/KMS resources" },
         "InstanceType"                  : { "default" : "Instance type" },
         "InstanceAMI"                   : { "default" : "Instance AMI" },
         "UserKeys"                      : { "default" : "Instance PEM keys" },
-        "Service"			: { "default" : "Service name" },
-        "StackEnv"			: { "default" : "Environment name" },
         "SNSEmail"                      : { "default" : "Alarm email address" }
       }
     }
@@ -33,6 +28,14 @@
 
   "Parameters" : {
 
+    "VPCStackName" : {
+      "Type"                            : "String",
+      "Default"                         : "zook-test-vpc",
+      "AllowedPattern"                  : "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "MinLength"                       : 1,
+      "MaxLength"                       : 255,
+      "Description"                     : "Name of our VPC CFN stack."
+    },
     "IAMStackName" : {
       "Type"                            : "String",
       "Default"                         : "zook-test-iam",
@@ -56,20 +59,6 @@
         "Type"                          : "AWS::EC2::KeyPair::KeyName",
         "Description"                   : "Your instance key pair name."
     },
-    "Service" : {
-        "Type"				: "String",
-        "Default"			: "kafka-zookeepers",
-        "Description"			: "Service name.",
-        "AllowedPattern"		: "[-a-zA-Z0-9]*",
-        "ConstraintDescription"		: "No spaces, dashes ok."
-    },
-    "StackEnv" : {
-        "Type"				: "String",
-        "Default"			: "test",
-        "Description"			: "Environment name.",
-        "AllowedPattern"		: "[-a-zA-Z0-9]*",
-        "ConstraintDescription"		: "No spaces, dashes ok."
-    },
     "SNSEmail" : {
         "Type"                          : "String",
         "Default"                       : "todd@evident.io",
@@ -78,769 +67,7 @@
     }
   },
 
-  "Mappings" : {
-
-    "RegionMap": {
-        "us-east-1"			: { "Abbr" : "ue1" },
-        "eu-west-1"			: { "Abbr" : "ew1" },
-        "ap-northeast-1"		: { "Abbr" : "an1" },
-        "us-west-1"			: { "Abbr" : "uw1" },
-        "us-west-2"			: { "Abbr" : "uw2" },
-        "ap-southeast-1"		: { "Abbr" : "as1" },
-        "ap-southeast-2"		: { "Abbr" : "as2" },
-        "sa-east-1"			: { "Abbr" : "se1" },
-        "eu-central-1"			: { "Abbr" : "ec1" }
-    },
-    "SubnetConfig" : {
-        "VPC"			: { "CIDR" : "10.79.0.0/23",   "GW" : "NA",          "MASK" : "255.255.254.0" },
-        "Public1"               : { "CIDR" : "10.79.0.0/26",   "GW" : "10.79.0.1",   "MASK" : "255.255.255.192" },
-        "Public2"               : { "CIDR" : "10.79.0.64/26",  "GW" : "10.79.0.65",  "MASK" : "255.255.255.192" },
-        "Public3"               : { "CIDR" : "10.79.0.128/26", "GW" : "10.79.0.129", "MASK" : "255.255.255.192" },
-        "Private1"              : { "CIDR" : "10.79.1.0/26",   "GW" : "10.79.1.1",   "MASK" : "255.255.255.192" },
-        "Private2"              : { "CIDR" : "10.79.1.64/26",  "GW" : "10.79.1.65",  "MASK" : "255.255.255.192" },
-        "Private3"              : { "CIDR" : "10.79.1.128/26", "GW" : "10.79.1.129", "MASK" : "255.255.255.192" }
-    }
-  },
-
   "Resources" : {
-    "ec2VPC" : {
-      "Type" : "AWS::EC2::VPC",
-        "Properties" : {
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ] },
-          "EnableDnsSupport"		: "true",
-          "EnableDnsHostnames"		: "true",
-          "InstanceTenancy"		: "default",
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "vpc",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2InternetGW" : {
-      "Type" : "AWS::EC2::InternetGateway",
-        "Properties" : {
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-				  	    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "igw",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-				  	  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2AttachGateway" : {
-      "Type" : "AWS::EC2::VPCGatewayAttachment",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-          "InternetGatewayId"		: { "Ref" : "ec2InternetGW" }
-      }
-    },
-
-    "ec2PublicSubnetAZ1" : {
-      "Type" : "AWS::EC2::Subnet",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public1", "CIDR" ] },
-          "AvailabilityZone" : { 
-            "Fn::Select"		: [ "0", { "Fn::GetAZs": "" } ]
-          },
-        "Tags": [
-            {
-                "Key"			: "Service",
-                "Value"			: { "Ref" : "Service" }
-            },
-            {
-                "Key"			: "Gateway",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public1", "GW" ] }
-            },
-            {
-                "Key"			: "Netmask",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public1", "MASK" ] }
-            },
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "public-az1",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-    "ec2PublicSubnetAZ2" : {
-      "Type" : "AWS::EC2::Subnet",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public2", "CIDR" ] },
-          "AvailabilityZone" : { 
-            "Fn::Select"		: [ "1", { "Fn::GetAZs": "" } ]
-          },
-        "Tags": [
-            {
-                "Key"			: "Service",
-                "Value"			: { "Ref" : "Service" }
-            },
-            {
-                "Key"			: "Gateway",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public2", "GW" ] }
-            },
-            {
-                "Key"			: "Netmask",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public2", "MASK" ] }
-            },
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "public-az2",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PublicSubnetAZ3" : {
-      "Type" : "AWS::EC2::Subnet",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public3", "CIDR" ] },
-          "AvailabilityZone" : { 
-            "Fn::Select"		: [ "2", { "Fn::GetAZs": "" } ]
-          },
-        "Tags": [
-            {
-                "Key"			: "Service",
-                "Value"			: { "Ref" : "Service" }
-            },
-            {
-                "Key"			: "Gateway",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public3", "GW" ] }
-            },
-            {
-                "Key"			: "Netmask",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Public3", "MASK" ] }
-            },
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "public-az3",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PrivateSubnetAZ1" : {
-      "Type" : "AWS::EC2::Subnet",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private1", "CIDR" ] },
-          "AvailabilityZone" : { 
-            "Fn::Select"		: [ "0", { "Fn::GetAZs": "" } ]
-          },
-        "Tags": [
-            {
-                "Key"			: "Service",
-                "Value"			: { "Ref" : "Service" }
-            },
-            {
-                "Key"			: "Gateway",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private1", "GW" ] }
-            },
-            {
-                "Key"			: "Netmask",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private1", "MASK" ] }
-            },
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "private-az1",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-    "ec2PrivateSubnetAZ2" : {
-      "Type" : "AWS::EC2::Subnet",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private2", "CIDR" ] },
-          "AvailabilityZone" : { 
-            "Fn::Select"		: [ "1", { "Fn::GetAZs": "" } ]
-          },
-        "Tags": [
-            {
-                "Key"			: "Service",
-                "Value"			: { "Ref" : "Service" }
-            },
-            {
-                "Key"			: "Gateway",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private2", "GW" ] }
-            },
-            {
-                "Key"			: "Netmask",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private2", "MASK" ] }
-            },
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "private-az2",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PrivateSubnetAZ3" : {
-      "Type" : "AWS::EC2::Subnet",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private3", "CIDR" ] },
-          "AvailabilityZone" : { 
-            "Fn::Select"		: [ "2", { "Fn::GetAZs": "" } ]
-          },
-        "Tags": [
-            {
-                "Key"			: "Service",
-                "Value"			: { "Ref" : "Service" }
-            },
-            {
-                "Key"			: "Gateway",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private3", "GW" ] }
-            },
-            {
-                "Key"			: "Netmask",
-                "Value"			: { "Fn::FindInMap" : [ "SubnetConfig", "Private3", "MASK" ] }
-            },
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "private-az3",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PublicRouteTable" : {
-      "Type" : "AWS::EC2::RouteTable",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "public-rtb",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PrivateRouteTableAZ1" : {
-      "Type" : "AWS::EC2::RouteTable",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "private-rtb1",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-    "ec2PrivateRouteTableAZ2" : {
-      "Type" : "AWS::EC2::RouteTable",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "private-rtb2",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-    "ec2PrivateRouteTableAZ3" : {
-      "Type" : "AWS::EC2::RouteTable",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "private-rtb3",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PubDefaultRoute" : {
-      "Type" : "AWS::EC2::Route",
-        "Properties" : {
-          "RouteTableId"		: { "Ref" : "ec2PublicRouteTable" },
-          "DestinationCidrBlock"	: "0.0.0.0/0",
-          "GatewayId"			: { "Ref" : "ec2InternetGW" }
-      }
-    },
-
-    "ec2PriDefaultRouteAZ1" : {
-      "Type" : "AWS::EC2::Route",
-      "DependsOn" : [ "ec2GatewayNAT1" ],
-        "Properties" : {
-          "RouteTableId"		: { "Ref" : "ec2PrivateRouteTableAZ1" },
-          "DestinationCidrBlock"	: "0.0.0.0/0",
-          "NatGatewayId"                : { "Ref" : "ec2GatewayNAT1" }
-      }
-    },
-    "ec2PriDefaultRouteAZ2" : {
-      "Type" : "AWS::EC2::Route",
-      "DependsOn" : [ "ec2GatewayNAT2" ],
-        "Properties" : {
-          "RouteTableId"		: { "Ref" : "ec2PrivateRouteTableAZ2" },
-          "DestinationCidrBlock"	: "0.0.0.0/0",
-          "NatGatewayId"                : { "Ref" : "ec2GatewayNAT2" }
-      }
-    },
-    "ec2PriDefaultRouteAZ3" : {
-      "Type" : "AWS::EC2::Route",
-      "DependsOn" : [ "ec2GatewayNAT3" ],
-        "Properties" : {
-          "RouteTableId"		: { "Ref" : "ec2PrivateRouteTableAZ3" },
-          "DestinationCidrBlock"	: "0.0.0.0/0",
-          "NatGatewayId"                : { "Ref" : "ec2GatewayNAT3" }
-      }
-    },
-
-    "ec2PublicSubnetRouteTableAssocAZ1" : {
-      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ1" },
-          "RouteTableId"		: { "Ref" : "ec2PublicRouteTable" }
-      }
-    },
-    "ec2PublicSubnetRouteTableAssocAZ2" : {
-      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ2" },
-          "RouteTableId"		: { "Ref" : "ec2PublicRouteTable" }
-      }
-    },
-    "ec2PublicSubnetRouteTableAssocAZ3" : {
-      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ3" },
-          "RouteTableId"		: { "Ref" : "ec2PublicRouteTable" }
-      }
-    },
-
-    "ec2PrivateSubnetRouteTableAssocAZ1" : {
-      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PrivateSubnetAZ1" },
-          "RouteTableId"		: { "Ref" : "ec2PrivateRouteTableAZ1" }
-      }
-    },
-    "ec2PrivateSubnetRouteTableAssocAZ2" : {
-      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PrivateSubnetAZ2" },
-          "RouteTableId"		: { "Ref" : "ec2PrivateRouteTableAZ2" }
-      }
-    },
-    "ec2PrivateSubnetRouteTableAssocAZ3" : {
-      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PrivateSubnetAZ3" },
-          "RouteTableId"		: { "Ref" : "ec2PrivateRouteTableAZ3" }
-      }
-    },
-
-    "ec2PublicSubnetNetworkAcl" : {
-      "Type" : "AWS::EC2::NetworkAcl",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "public-acl",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PublicSubnetAclEntryIn100" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "100",
-          "Protocol"			: "-1",
-          "RuleAction"			: "allow",
-          "Egress"			: "false",
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ] }
-        }
-    },
-    "ec2PublicSubnetAclEntryIn200" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "200",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "443", "To" : "443" },
-          "RuleAction"			: "allow",
-          "Egress"			: "false",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-    "ec2PublicSubnetAclEntryIn300" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "300",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "80", "To" : "80" },
-          "RuleAction"			: "allow",
-          "Egress"			: "false",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-    "ec2PublicSubnetAclEntryIn400" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "400",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "1024", "To" : "65535" },
-          "RuleAction"			: "allow",
-          "Egress"			: "false",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-    "ec2PublicSubnetAclEntryOut100" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "100",
-          "Protocol"			: "-1",
-          "RuleAction"			: "allow",
-          "Egress"			: "true",
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ] }
-        }
-    },
-    "ec2PublicSubnetAclEntryOut200" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "200",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "1024", "To" : "65535" },
-          "RuleAction"			: "allow",
-          "Egress"			: "true",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-    "ec2PublicSubnetAclEntryOut300" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "300",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "443", "To" : "443" },
-          "RuleAction"			: "allow",
-          "Egress"			: "true",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-    "ec2PublicSubnetAclEntryOut400" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" },
-          "RuleNumber"			: "400",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "80", "To" : "80" },
-          "RuleAction"			: "allow",
-          "Egress"			: "true",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-
-    "ec2PublicSubnetNetworkAclAssocAZ1" : {
-      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ1" },
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" }
-      }
-    },
-    "ec2PublicSubnetNetworkAclAssocAZ2" : {
-      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ2" },
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" }
-      }
-    },
-    "ec2PublicSubnetNetworkAclAssocAZ3" : {
-      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ3" },
-          "NetworkAclId"		: { "Ref" : "ec2PublicSubnetNetworkAcl" }
-      }
-    },
-
-    "ec2PrivateSubnetNetworkAcl" : {
-      "Type" : "AWS::EC2::NetworkAcl",
-        "Properties" : {
-          "VpcId"			: { "Ref" : "ec2VPC" },
-        "Tags": [
-            {
-                "Key"			: "Name",
-                "Value"			: { "Fn::Join" : [ "-",
-					    [
-					      { "Ref" : "Service" },
-					      { "Ref" : "StackEnv" },
-					       "private-acl",
-					      { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
-					    ]
-					  ]
-					}
-            }
-        ]
-      }
-    },
-
-    "ec2PrivateSubnetAclEntryIn100" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" },
-          "RuleNumber"			: "100",
-          "Protocol"			: "-1",
-          "RuleAction"			: "allow",
-          "Egress"			: "false",
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ] }
-        }
-    },
-    "ec2PrivateSubnetAclEntryIn200" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" },
-          "RuleNumber"			: "200",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "1024", "To" : "65535" },
-          "RuleAction"			: "allow",
-          "Egress"			: "false",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-    "ec2PrivateSubnetAclEntryOut100" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" },
-          "RuleNumber"			: "100",
-          "Protocol"			: "-1",
-          "RuleAction"			: "allow",
-          "Egress"			: "true",
-          "CidrBlock"			: { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ] }
-        }
-    },
-    "ec2PrivateSubnetAclEntryOut200" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" },
-          "RuleNumber"			: "200",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "443", "To" : "443" },
-          "RuleAction"			: "allow",
-          "Egress"			: "true",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-    "ec2PrivateSubnetAclEntryOut300" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-        "Properties" : {
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" },
-          "RuleNumber"			: "300",
-          "Protocol"			: "6",
-          "PortRange"			: { "From" : "80", "To" : "80" },
-          "RuleAction"			: "allow",
-          "Egress"			: "true",
-          "CidrBlock"			: "0.0.0.0/0"
-        }
-    },
-
-    "ec2PrivateSubnetNetworkAclAssocAZ1" : {
-      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PrivateSubnetAZ1" },
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" }
-      }
-    },
-    "ec2PrivateSubnetNetworkAclAssocAZ2" : {
-      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PrivateSubnetAZ2" },
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" }
-      }
-    },
-    "ec2PrivateSubnetNetworkAclAssocAZ3" : {
-      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-        "Properties" : {
-          "SubnetId"			: { "Ref" : "ec2PrivateSubnetAZ3" },
-          "NetworkAclId"		: { "Ref" : "ec2PrivateSubnetNetworkAcl" }
-      }
-    },
-
-    "ec2IPAddressNAT1" : {
-      "Type" : "AWS::EC2::EIP",
-      "Properties" : {
-        "Domain"                        : "vpc"
-      }
-    },
-    "ec2GatewayNAT1" : {
-      "Type" : "AWS::EC2::NatGateway",
-      "DependsOn" : [ "ec2IPAddressNAT1", "ec2PublicSubnetAZ1" ],
-      "Properties" : {
-      "AllocationId"			: { "Fn::GetAtt" : ["ec2IPAddressNAT1", "AllocationId"]},
-      "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ1"}
-      }
-    },
-
-    "ec2IPAddressNAT2" : {
-      "Type" : "AWS::EC2::EIP",
-      "Properties" : {
-        "Domain"                        : "vpc"
-      }
-    },
-    "ec2GatewayNAT2" : {
-      "Type" : "AWS::EC2::NatGateway",
-      "DependsOn" : [ "ec2IPAddressNAT2", "ec2PublicSubnetAZ2" ],
-      "Properties" : {
-      "AllocationId"			: { "Fn::GetAtt" : ["ec2IPAddressNAT2", "AllocationId"]},
-      "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ2"}
-      }
-    },
-
-    "ec2IPAddressNAT3" : {
-      "Type" : "AWS::EC2::EIP",
-      "Properties" : {
-        "Domain"                        : "vpc"
-      }
-    },
-    "ec2GatewayNAT3" : {
-      "Type" : "AWS::EC2::NatGateway",
-      "DependsOn" : [ "ec2IPAddressNAT3", "ec2PublicSubnetAZ3" ],
-      "Properties" : {
-      "AllocationId"			: { "Fn::GetAtt" : ["ec2IPAddressNAT3", "AllocationId"]},
-      "SubnetId"			: { "Ref" : "ec2PublicSubnetAZ3"}
-      }
-    },
-
-    "ec2InstanceSecurityGroup" : {
-      "Type" : "AWS::EC2::SecurityGroup",
-      "Properties" : {
-        "GroupDescription"              : "Security group for our zook instances.",
-        "VpcId"                         : { "Ref" : "ec2VPC" },
-        "Tags": [
-          { "Key" : "Service", "Value" : { "Ref" : "Service" } },
-          { "Key" : "Name", "Value" : "zook-test" }
-        ],
-        "SecurityGroupIngress" : [
-          { "IpProtocol"                : "tcp",
-            "FromPort"                  : "22",
-            "ToPort"                    : "22",
-            "CidrIp"                    : { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ] }
-          }
-        ]
-      }
-    },
 
     "snsASTopic" : {
       "Type" : "AWS::SNS::Topic",
@@ -857,7 +84,6 @@
 
     "alcServerlaunch" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
-      "DependsOn" : [ "ec2InstanceSecurityGroup", "ec2PublicSubnetRouteTableAssocAZ1", "ec2PublicSubnetRouteTableAssocAZ2", "ec2PublicSubnetRouteTableAssocAZ3" ],
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "config" : {
@@ -902,9 +128,9 @@
         "ImageId"                       : { "Ref" : "InstanceAMI" },
         "KeyName"                       : { "Ref" : "UserKeys" },
         "InstanceType"                  : { "Ref" : "InstanceType" },
-        "SecurityGroups"                : [ { "Ref" : "ec2InstanceSecurityGroup" } ],
+        "SecurityGroups"                : [ { "Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-SecurityGroup" } } ],
         "IamInstanceProfile"            : { "Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-InstanceProfile" } },
-        "AssociatePublicIpAddress"      : "true",
+        "AssociatePublicIpAddress"      : "false",
         "UserData" : {
           "Fn::Base64" : {
             "Fn::Join" : [ "", [
@@ -923,8 +149,15 @@
               "wget https://s3.amazonaws.com/todd-zook-pub/bind_ebs.sh", "\n",
               "chmod +x bind_eni.sh", "\n",
               "chmod +x bind_ebs.sh", "\n",
-              "./bind_eni.sh ", {"Ref" : "AWS::Region"}, " ", {"Ref" : "ec2InstanceSecurityGroup"}, " ", {"Ref" : "Service"}, "\n",
-              "./bind_ebs.sh ", {"Ref" : "AWS::Region"}, " ", {"Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKeyArn"}}, " ", {"Ref": "snsASTopic"}, " ", {"Ref" : "Service"}, "\n",
+
+              "./bind_eni.sh ", {"Ref" : "AWS::Region"}, " ",
+               {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-SecurityGroup"}}, " ",
+               {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-Service"}}, "\n",
+
+              "./bind_ebs.sh ", {"Ref" : "AWS::Region"}, " ",
+               {"Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKeyArn"}}, " ",
+               {"Ref": "snsASTopic"}, " ",
+               {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-Service"}}, "\n",
 
               "/usr/local/bin/cfn-init",
               " --stack ", { "Ref": "AWS::StackName" },
@@ -945,7 +178,7 @@
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "DependsOn" : [ "snsASTopic" ],
       "Properties" : {
-        "VPCZoneIdentifier"             : [ { "Ref" : "ec2PublicSubnetAZ1" }, { "Ref" : "ec2PublicSubnetAZ2" }, { "Ref" : "ec2PublicSubnetAZ3" } ],
+        "VPCZoneIdentifier"             : [{"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-PriSubnetAZ1"}}, {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-PriSubnetAZ2"}}, {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-PriSubnetAZ3"}}],
         "Cooldown"                      : "300",
         "DesiredCapacity"               : "3",
         "MaxSize"                       : "3",
@@ -954,7 +187,7 @@
         "HealthCheckGracePeriod"        : "180",
         "LaunchConfigurationName"       : { "Ref" : "alcServerlaunch" },
         "Tags": [
-          { "Key" : "Service", "Value" : { "Ref" : "Service" }, "PropagateAtLaunch" : true },
+          { "Key" : "Service", "Value" : {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-Service"}}, "PropagateAtLaunch" : true },
           { "Key" : "Name", "Value"  : "zook-test", "PropagateAtLaunch" : true }
         ],
         "NotificationConfiguration" : {
@@ -1032,95 +265,6 @@
       "Dimensions"                      : [ { "Name": "AutoScalingGroupName", "Value": { "Ref": "asgServergroup" } } ],
       "ComparisonOperator"              : "GreaterThanThreshold"
       }
-    }
-  },
-
-  "Outputs" : {
-
-    "VPCId" : {
-      "Description"                     : "VPC Id",
-      "Value"                           : { "Ref" : "ec2VPC" }
-    },
-    "GatewayIPAZ1" : {
-      "Description"                     : "GatewayNAT1 Public IP",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                            [
-                                              "IP for NAT1 is",
-                                              { "Ref" : "ec2IPAddressNAT1" }
-                                            ]
-                                          ] }
-    },
-    "GatewayIPAZ2" : {
-      "Description"                     : "GatewayNAT2 Public IP",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                            [
-                                              "IP for NAT2 is",
-                                              { "Ref" : "ec2IPAddressNAT2" }
-                                            ]
-                                          ] }
-    },
-    "GatewayIPAZ3" : {
-      "Description"                     : "GatewayNAT3 Public IP",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                            [
-                                              "IP for NAT3 is",
-                                              { "Ref" : "ec2IPAddressNAT3" }
-                                            ]
-                                          ] }
-    },
-    "PubSubnetAZ1" : {
-      "Description"                     : "Public Subnet Id for AZ1",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                                  [
-                                                    { "Ref" : "ec2PublicSubnetAZ1" }, "in",
-                                                    { "Fn::GetAtt" : [ "ec2PublicSubnetAZ1", "AvailabilityZone" ] }
-                                                  ]
-                                                ] }
-    },
-    "PubSubnetAZ2" : {
-      "Description"                     : "Public Subnet Id for AZ2",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                                  [
-                                                    { "Ref" : "ec2PublicSubnetAZ2" }, "in",
-                                                    { "Fn::GetAtt" : [ "ec2PublicSubnetAZ2", "AvailabilityZone" ] }
-                                                  ]
-                                                ] }
-    },
-    "PubSubnetAZ3" : {
-      "Description"                     : "Public Subnet Id for AZ3",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                                  [
-                                                    { "Ref" : "ec2PublicSubnetAZ3" }, "in",
-                                                    { "Fn::GetAtt" : [ "ec2PublicSubnetAZ3", "AvailabilityZone" ] }
-                                                  ]
-                                                ] }
-    },
-    "PriSubnetAZ1" : {
-      "Description"                     : "Private Subnet Id for AZ1",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                                  [
-                                                    { "Ref" : "ec2PrivateSubnetAZ1" }, "in",
-                                                    { "Fn::GetAtt" : [ "ec2PrivateSubnetAZ1", "AvailabilityZone" ] }
-                                                  ]
-                                                ] }
-    },
-    "PriSubnetAZ2" : {
-      "Description"                     : "Private Subnet Id for AZ2",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                                  [
-                                                    { "Ref" : "ec2PrivateSubnetAZ2" }, "in",
-                                                    { "Fn::GetAtt" : [ "ec2PrivateSubnetAZ2", "AvailabilityZone" ] }
-                                                  ]
-                                                ] }
-    },
-    "PriSubnetAZ3" : {
-      "Description"                     : "Private Subnet Id for AZ3",
-      "Value"                           : { "Fn::Join" : [ " ",
-                                                  [
-                                                    { "Ref" : "ec2PrivateSubnetAZ3" }, "in",
-                                                    { "Fn::GetAtt" : [ "ec2PrivateSubnetAZ3", "AvailabilityZone" ] }
-                                                  ]
-                                                ] }
     }
   }
 }
