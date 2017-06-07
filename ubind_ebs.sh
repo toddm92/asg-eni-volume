@@ -40,7 +40,7 @@ do_stop () {
 
     local SERVICE="kafka-zookeepers"
     local MOUNT_PATH="/evident/kafka-zookeeper/data"
-    local REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//')
+    local REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed -e 's/.$//')
     local INST=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 
     umount $MOUNT_PATH 2> /dev/null
