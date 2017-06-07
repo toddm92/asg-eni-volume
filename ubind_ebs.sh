@@ -11,7 +11,7 @@
 ### END INIT INFO
 
 ### SETUP
-# place in /etc/init.d
+# place in /etc/init.d/<script_name>
 # run chmod +x <script_name>
 # run update-rc.d <script_name> defaults
 ###
