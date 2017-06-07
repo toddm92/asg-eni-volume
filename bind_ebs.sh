@@ -125,7 +125,7 @@ echo "$FILE_SYS    $MOUNT_PATH         ext4    noauto,discard  0 0" >> /etc/fsta
 # Mount the volume
 mount $MOUNT_PATH
 
-# ** These cmds will have to be baked into the AMI if no Public IP is assigned to the instance **
+# ** These cmds will have to be baked into the AMI if the instance doesn't have Internet access **
 # Install AWS disk monitorig utils
 apt-get -y update &> /dev/null
 apt-get -y install unzip &> /dev/null
