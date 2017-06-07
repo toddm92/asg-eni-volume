@@ -16,7 +16,7 @@
 # run update-rc.d <script_name> defaults
 ###
 
-function get_vol() {
+get_vol () {
     local VOL_ID=$(aws ec2 describe-volumes \
        --region $1 \
        --filters Name=attachment.instance-id,Values=$2 \
@@ -32,7 +32,7 @@ detach_vol () {
        --instance-id $2 \
        --volume-id $3
 
-    aws ec2 wait volume-available --volume-ids $3 --region $1
+    ##aws ec2 wait volume-available --volume-ids $3 --region $1
 }
 
 
