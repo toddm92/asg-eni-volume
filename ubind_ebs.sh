@@ -1,38 +1,73 @@
-#!/bin/bash
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          ubind_ebs
+# Required-Start:
+# Required-Stop:     umountfs
+# Should-Stop:       halt
+# Default-Start:
+# Default-Stop:      0
+# Short-Description: Detach AWS Volume.
+# Description:       Detach an AWS EBS Volume.
+### END INIT INFO
 
-export INST=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-export REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed -e 's/.$//')
-export MOUNT_PATH="/evident/kafka-zookeeper/data"
+### SETUP
+# place in /etc/init.d
+# run chmod +x <script_name>
+# run update-rc.d <script_name> defaults
+###
 
 function get_vol() {
     local VOL_ID=$(aws ec2 describe-volumes \
-       --region $REGION \
-       --filters Name=attachment.instance-id,Values=$INST \
+       --region $1 \
+       --filters Name=attachment.instance-id,Values=$2 \
+                 Name=tag:Service,Values=$3 \
        --query 'Volumes[0].VolumeId' | tr -d '"')
 
-    echo "$VOL_ID";
+    echo "$VOL_ID"
 }
 
-function detach_vol() {
+detach_vol () {
     # Requires one arg, an EBS volume_id
     aws ec2 detach-volume \
-       --region $REGION \
-       --instance-id $INST \
-       --volume-id $1
+       --region $1 \
+       --instance-id $2 \
+       --volume-id $3
+
+    aws ec2 wait volume-available --volume-ids $3 --region $1
 }
 
 
-# Do the work...
-#
-df -k | grep $MOUNT_PATH &> /dev/null
+do_stop () {
 
-if [ $? -eq 0 ]; then
-    umount $MOUNT_PATH
-fi
+    local SERVICE="kafka-zookeepers"
+    local MOUNT_PATH="/evident/kafka-zookeeper/data"
+    local REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//')
+    local INST=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 
-VOL_ID=$(get_vol)
+    umount $MOUNT_PATH 2> /dev/null
 
-if [[ $VOL_ID == vol-* ]]; then
-    detach_vol $VOL_ID
-fi
+    VOL_ID=$(get_vol $REGION $INST $SERVICE)
 
+    if echo "$VOL_ID" | grep -q "vol-"; then
+        detach_vol $REGION $INST $VOL_ID
+    fi
+}
+
+case "$1" in
+  start|status)
+	# No-op
+	;;
+  restart|reload|force-reload)
+	echo "Error: argument '$1' not supported" >&2
+	exit 3
+	;;
+  stop)
+	do_stop
+	;;
+  *)
+	echo "Usage: $0 start|stop" >&2
+	exit 3
+	;;
+esac
+
+:
