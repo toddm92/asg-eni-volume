@@ -2,7 +2,7 @@
 ### BEGIN INIT INFO
 # Provides:          ubind_ebs
 # Required-Start:
-# Required-Stop:     umountfs
+# Required-Stop:
 # Should-Stop:       halt
 # Default-Start:
 # Default-Stop:      0
@@ -27,7 +27,6 @@ function get_vol() {
 }
 
 detach_vol () {
-    # Requires one arg, an EBS volume_id
     aws ec2 detach-volume \
        --region $1 \
        --instance-id $2 \
