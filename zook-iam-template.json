@@ -117,6 +117,7 @@
                        "ec2:DetachVolume",
                        "ec2:CreateVolume",
                        "ec2:DescribeSubnets",
+                       "ec2:DescribeInstances",
                        "ec2:CreateTags",
                        "autoscaling:Describe*",
                        "cloudwatch:*",
