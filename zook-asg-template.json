@@ -147,8 +147,10 @@
 
               "wget https://s3.amazonaws.com/todd-zook-pub/bind_eni.sh", "\n",
               "wget https://s3.amazonaws.com/todd-zook-pub/bind_ebs.sh", "\n",
+              "wget https://s3.amazonaws.com/todd-zook-pub/clean_up.sh", "\n",
               "chmod +x bind_eni.sh", "\n",
               "chmod +x bind_ebs.sh", "\n",
+              "chmod +x clean_up.sh", "\n",
 
               "./bind_eni.sh ", {"Ref" : "AWS::Region"}, " ",
                {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-SecurityGroup"}}, " ",
@@ -157,6 +159,9 @@
               "./bind_ebs.sh ", {"Ref" : "AWS::Region"}, " ",
                {"Fn::ImportValue" : {"Fn::Sub": "${IAMStackName}-EBSKeyArn"}}, " ",
                {"Ref": "snsASTopic"}, " ",
+               {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-Service"}}, "\n",
+
+              "./clean_up.sh ", {"Ref" : "AWS::Region"}, " ",
                {"Fn::ImportValue" : {"Fn::Sub": "${VPCStackName}-Service"}}, "\n",
 
               "/usr/local/bin/cfn-init",
