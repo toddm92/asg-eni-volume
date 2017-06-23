@@ -9,6 +9,7 @@ Resource | Description
 -------- | ------------
 bind_eni.sh | Locates an existing network interface or creates one if one doesn't already exist matching our criteria.
 bind_ebs.sh | Locates an existing volume or creates one if one doesn't already exist matching our criteria. Sets up disk utilization CloudWatch monitors and alerts.
+clean_up.sh | Removes the CloudWatch alarms associated with terminated instances.
 ubind_ebs.sh | /ete/init.d script to detach EBS volumes on shutdown.
 zook-asg-template.json | CFN template that creates an ASG and runs the above bash scripts from UserData.
 zook-iam-template.json | CFN template that creates a KMS encryption key and IAM instance profile.
@@ -35,7 +36,7 @@ Note: Launch the VPC and IAM stacks first, followed by the ASG stack last.
 }
 ```
 
-- [ ] Clean up unused CloudWatch disk alarms.
+- [x] Clean up unused CloudWatch disk alarms.
 
 ### References
 
